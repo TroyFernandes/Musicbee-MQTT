@@ -23,6 +23,8 @@ musicbee
 
 The plugin needs info about your mqtt server (ip, port, creds), and uses a persistent file to save this info. **The plugin wont create the file automatically.**
 
+1. Add the ```mb_MQTT.dll``` to your musicbee plugins folder
+
 Heres how you can create that file.
 
 1. Go to the musicbee appdata folder. On regular installations it should be the path: ```C:\Users\Troy\AppData\Roaming\MusicBee``` (troy in this instance is your account username)
