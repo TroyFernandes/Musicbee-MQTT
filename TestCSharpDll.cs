@@ -2,7 +2,6 @@
 using System.Drawing;
 using System.Windows.Forms;
 using MQTTnet;
-using MQTTnet.Client;
 using System.Threading;
 using System.Threading.Tasks;
 using Nito.AsyncEx.Synchronous;
@@ -21,7 +20,7 @@ namespace MusicBeePlugin
         private MusicBeeApiInterface mbApiInterface;
         private PluginInfo about = new PluginInfo();
 
-        MqttFactory factory;
+        MqttClientFactory factory;
         IMqttClient mqttClient;
 
         public PluginInfo Initialise(IntPtr apiInterfacePtr)
@@ -239,7 +238,7 @@ namespace MusicBeePlugin
             var (addr, port, user, pass) = ReadSettings();
 
             // Create a MQTT client factory
-            var factory = new MqttFactory();
+            var factory = new MqttClientFactory();
 
             // Create a MQTT client instance
             mqttClient = factory.CreateMqttClient();
