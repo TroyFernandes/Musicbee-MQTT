@@ -1,4 +1,4 @@
-name: Build and Release2
+name: Build and Release
 
 on:
   push:
@@ -31,39 +31,30 @@ jobs:
       
     - name: Build
       run: dotnet build --configuration Release --no-restore
-      
-    - name: Install ILMerge
-      run: dotnet tool install -g ilmerge
-      
-    - name: Merge DLLs
+
+    - name: List Build Output
       shell: pwsh
       run: |
-        $outputDir = "merged"
-        New-Item -ItemType Directory -Force -Path $outputDir
-        
-        ilmerge /out:$outputDir/mb_MQTT.dll `
-                /target:dll `
-                /targetplatform:v4 `
-                "bin/Release/net8.0-windows/mb_MQTT.dll" `
-                "bin/Release/net8.0-windows/*.dll" `
-                /exclude:mb_MQTT.dll.config `
-                /exclude:mb_MQTT.deps.json
+        Write-Host "Build Output Files:"
+        Get-ChildItem -Path "bin/Release/net8.0-windows" -Recurse | ForEach-Object {
+          Write-Host $_.FullName
+        }
                 
     - name: Create Release
       id: create_release
       uses: softprops/action-gh-release@v1
       if: startsWith(github.ref, 'refs/tags/')
       with:
-        files: merged/mb_MQTT.dll
+        files: bin/Release/net8.0-windows/mb_MQTT.dll
         name: Release ${{ steps.get_version.outputs.version }}
         body: |
           MusicBee MQTT Plugin v${{ steps.get_version.outputs.version }}
           
           This release contains:
-          - Merged DLL file (mb_MQTT.dll)
+          - mb_MQTT.dll
           
           Installation:
-          1. Copy mb_MQTT.dll to your MusicBee Plugins folder
+          1. Copy mb_MQTT.dll and its dependencies to your MusicBee Plugins folder
           2. Restart MusicBee
         draft: false
         prerelease: false
