@@ -61,5 +61,3 @@ jobs:
           bin/Release/net8.0-windows/mb_MQTT.dll
         name: ${{ steps.get_version.outputs.version }}
         tag_name: v${{ steps.get_version.outputs.version }}
-        server_url: ${{ secrets.GITEA_SERVER_URL }}
-        token: ${{ secrets.GITEA_TOKEN }}
