@@ -8,9 +8,19 @@ on:
 jobs:
   build-and-release:
     runs-on: [self-hosted, windows]
+    env:
+      DOTNET_ROOT: 'C:\\Program Files\\dotnet'
+      PATH: 'C:\\Program Files\\dotnet;${{ env.PATH }}'
 
     steps:
     - uses: actions/checkout@v4
+
+    - name: Check dotnet on runner
+      shell: pwsh
+      run: |
+        Write-Host 'Runner dotnet version:'
+        dotnet --version
+        dotnet --info
 
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
