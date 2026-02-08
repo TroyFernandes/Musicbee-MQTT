@@ -2,6 +2,8 @@ name: Build and Release to Gitea
 
 on:
   push:
+    tags:
+      - 'v*'
     branches:
       - feature/gitea-release-workflow
 
@@ -37,20 +39,6 @@ jobs:
     - name: Build
       shell: pwsh
       run: dotnet build --configuration Release --no-restore
-
-    - name: Verify Costura embedding
-      shell: pwsh
-      run: |
-        $dll = Get-Item "bin/Release/net8.0-windows/mb_MQTT.dll"
-        Write-Host "mb_MQTT.dll size: $([math]::Round($dll.Length / 1KB, 1)) KB"
-        if ($dll.Length -lt 100KB) {
-          Write-Host "::warning::DLL is small - Costura may not have embedded dependencies"
-        } else {
-          Write-Host "DLL looks good - dependencies likely embedded"
-        }
-        Write-Host "`nAll DLLs in output:"
-        Get-ChildItem -Path "bin/Release/net8.0-windows" -Filter "*.dll" |
-          Format-Table Name, @{N='Size(KB)';E={[math]::Round($_.Length/1KB,1)}} -AutoSize
 
     - name: Create Gitea Release
       uses: akkuman/gitea-release-action@v1
