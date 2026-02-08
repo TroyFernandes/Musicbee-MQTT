@@ -8,56 +8,54 @@ on:
 jobs:
   build-and-release:
     runs-on: [self-hosted, windows]
-    env:
-      DOTNET_ROOT: 'C:\\Program Files\\dotnet'
-      PATH: 'C:\\Program Files\\dotnet;${{ env.PATH }}'
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Check dotnet on runner
+    - name: Verify dotnet
       shell: pwsh
       run: |
-        Write-Host 'Runner dotnet version:'
         dotnet --version
-        dotnet --info
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: 8.0.x
+        dotnet --list-sdks
 
     - name: Extract version from code
       id: get_version
       shell: pwsh
       run: |
         $content = Get-Content "TestCSharpDll.cs"
-        $major = ($content | Select-String "about.VersionMajor = (\d+)").Matches.Groups[1].Value
-        $minor = ($content | Select-String "about.VersionMinor = (\d+)").Matches.Groups[1].Value
-        $revision = ($content | Select-String "about.Revision = (\d+)").Matches.Groups[1].Value
+        $major = ($content | Select-String 'about\.VersionMajor = (\d+)').Matches.Groups[1].Value
+        $minor = ($content | Select-String 'about\.VersionMinor = (\d+)').Matches.Groups[1].Value
+        $revision = ($content | Select-String 'about\.Revision = (\d+)').Matches.Groups[1].Value
         $version = "$major.$minor.$revision"
+        Write-Host "Detected version: $version"
         echo "version=$version" >> $env:GITHUB_OUTPUT
 
     - name: Restore dependencies
-      run: dotnet restore
       shell: pwsh
+      run: dotnet restore
 
     - name: Build
-      run: dotnet build --configuration Release --no-restore
       shell: pwsh
+      run: dotnet build --configuration Release --no-restore
 
-    - name: List Build Output
+    - name: Verify Costura embedding
       shell: pwsh
       run: |
-        Write-Host "Build Output Files:"
-        Get-ChildItem -Path "bin/Release/net8.0-windows" -Recurse | ForEach-Object {
-          Write-Host $_.FullName
+        $dll = Get-Item "bin/Release/net8.0-windows/mb_MQTT.dll"
+        Write-Host "mb_MQTT.dll size: $([math]::Round($dll.Length / 1KB, 1)) KB"
+        if ($dll.Length -lt 100KB) {
+          Write-Host "::warning::DLL is small - Costura may not have embedded dependencies"
+        } else {
+          Write-Host "DLL looks good - dependencies likely embedded"
         }
+        Write-Host "`nAll DLLs in output:"
+        Get-ChildItem -Path "bin/Release/net8.0-windows" -Filter "*.dll" |
+          Format-Table Name, @{N='Size(KB)';E={[math]::Round($_.Length/1KB,1)}} -AutoSize
 
     - name: Create Gitea Release
       uses: akkuman/gitea-release-action@v1
       with:
-        files: |- 
+        files: |-
           bin/Release/net8.0-windows/mb_MQTT.dll
-        name: ${{ steps.get_version.outputs.version }}
+        name: v${{ steps.get_version.outputs.version }}
         tag_name: v${{ steps.get_version.outputs.version }}
