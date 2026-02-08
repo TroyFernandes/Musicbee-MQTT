@@ -20,8 +20,8 @@ namespace MusicBeePlugin
         private MusicBeeApiInterface mbApiInterface;
         private PluginInfo about = new PluginInfo();
 
-        MqttClientFactory factory;
         IMqttClient mqttClient;
+        MqttClientOptions mqttOptions;
 
         public PluginInfo Initialise(IntPtr apiInterfacePtr)
         {
@@ -33,9 +33,9 @@ namespace MusicBeePlugin
             about.Author = "TF";
             about.TargetApplication = "";   //  the name of a Plugin Storage device or panel header for a dockable panel
             about.Type = PluginType.General;
-            about.VersionMajor = 1;  // your plugin version
+            about.VersionMajor = 2;  // your plugin version
             about.VersionMinor = 0;
-            about.Revision = 1;
+            about.Revision = 0;
             about.MinInterfaceVersion = MinInterfaceVersion;
             about.MinApiRevision = MinApiRevision;
             about.ReceiveNotifications = (ReceiveNotificationFlags.PlayerEvents | ReceiveNotificationFlags.TagEvents);
@@ -79,7 +79,11 @@ namespace MusicBeePlugin
         public void Close(PluginCloseReason reason)
         {
             PublishAsync(mqttClient, "musicbee/player/playing", "false").WaitWithoutException();
-            PublishAsync(mqttClient, "musicbee/player/status", "offline").Ignore();
+            PublishAsync(mqttClient, "musicbee/player/status", "offline").WaitWithoutException();
+            if (mqttClient?.IsConnected == true)
+            {
+                mqttClient.DisconnectAsync().WaitWithoutException();
+            }
         }
 
         public void Uninstall()
@@ -130,6 +134,8 @@ namespace MusicBeePlugin
 
         static async Task PublishAsync(IMqttClient client, string topic, string payload)
         {
+            if (client?.IsConnected != true)
+                return;
 
             var message = new MqttApplicationMessageBuilder()
                 .WithTopic(topic)
@@ -137,8 +143,7 @@ namespace MusicBeePlugin
                 .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.ExactlyOnce)
                 .Build();
 
-            client.PublishAsync(message, CancellationToken.None).WaitWithoutException();
-
+            await client.PublishAsync(message, CancellationToken.None);
         }
 
         private void handleCommand(MqttApplicationMessageReceivedEventArgs x)
@@ -184,9 +189,9 @@ namespace MusicBeePlugin
                         break;
                 }
             }
-            catch (JsonReaderException e)
+            catch (JsonReaderException)
             {
-
+                // Ignore malformed JSON commands
             }
 
 
@@ -236,36 +241,53 @@ namespace MusicBeePlugin
         public async Task ConnectMQTTAsync()
         {
             var (addr, port, user, pass) = ReadSettings();
+            if (addr == null) return;
 
-            // Create a MQTT client factory
             var factory = new MqttClientFactory();
-
-            // Create a MQTT client instance
             mqttClient = factory.CreateMqttClient();
 
-            // Create MQTT client options
-            var options = new MqttClientOptionsBuilder()
-                .WithTcpServer(addr, port) // MQTT broker address and port
-                .WithCredentials(user, pass) // Set username and password
+            mqttOptions = new MqttClientOptionsBuilder()
+                .WithTcpServer(addr, port)
+                .WithCredentials(user, pass)
                 .WithCleanSession()
                 .Build();
 
-            var connectResult = await mqttClient.ConnectAsync(options);
+            // Auto-reconnect on disconnect
+            mqttClient.DisconnectedAsync += async e =>
+            {
+                await Task.Delay(TimeSpan.FromSeconds(5));
+                try
+                {
+                    await mqttClient.ConnectAsync(mqttOptions);
+                }
+                catch
+                {
+                    // Connection failed — will retry on next disconnect event
+                }
+            };
 
-            //Console.WriteLine(connectResult.ToString());
+            mqttClient.ConnectedAsync += async e =>
+            {
+                // (Re)subscribe and publish status on every successful connection
+                await mqttClient.SubscribeAsync(new MqttTopicFilterBuilder().WithTopic("musicbee/command").Build());
+                await PublishAsync(mqttClient, "musicbee/player/status", "online");
+                await PublishAsync(mqttClient, "musicbee/player/playing", "false");
+            };
 
-            PublishAsync(mqttClient, "musicbee/player/status", "online").Ignore();
-            PublishAsync(mqttClient, "musicbee/player/playing", "false").WaitWithoutException();
-
-            mqttClient.SubscribeAsync(new MqttTopicFilterBuilder().WithTopic("musicbee/command").Build()).WaitWithoutException();
-
-            // Callback function when a message is received
             mqttClient.ApplicationMessageReceivedAsync += e =>
             {
                 handleCommand(e);
                 return Task.CompletedTask;
             };
 
+            try
+            {
+                await mqttClient.ConnectAsync(mqttOptions);
+            }
+            catch
+            {
+                // MQTT server unreachable at startup — reconnect loop will handle it
+            }
         }
 
     }
