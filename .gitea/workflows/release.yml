@@ -24,7 +24,7 @@ jobs:
       id: get_version
       shell: pwsh
       run: |
-        $content = Get-Content "TestCSharpDll.cs"
+        $content = Get-Content "Plugin.cs"
         $major = ($content | Select-String 'about\.VersionMajor = (\d+)').Matches.Groups[1].Value
         $minor = ($content | Select-String 'about\.VersionMinor = (\d+)').Matches.Groups[1].Value
         $revision = ($content | Select-String 'about\.Revision = (\d+)').Matches.Groups[1].Value
@@ -44,6 +44,6 @@ jobs:
       uses: akkuman/gitea-release-action@v1
       with:
         files: |-
-          bin/Release/net8.0-windows/mb_MQTT.dll
+          bin/Release/net48/mb_MQTT.dll
         name: v${{ steps.get_version.outputs.version }}
         tag_name: v${{ steps.get_version.outputs.version }}

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:base"],
+  "packageRules": [
+    {
+      "matchPackageNames": ["MQTTnet"],
+      "enabled": false,
+      "description": "MQTTnet 5.x+ requires .NET 8 and is incompatible with MusicBee's .NET Framework 4.x runtime"
+    }
+  ]
+}

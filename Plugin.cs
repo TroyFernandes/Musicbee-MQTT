@@ -2,6 +2,7 @@
 using System.Drawing;
 using System.Windows.Forms;
 using MQTTnet;
+using MQTTnet.Client;
 using System.Threading;
 using System.Threading.Tasks;
 using Nito.AsyncEx.Synchronous;
@@ -243,7 +244,7 @@ namespace MusicBeePlugin
             var (addr, port, user, pass) = ReadSettings();
             if (addr == null) return;
 
-            var factory = new MqttClientFactory();
+            var factory = new MqttFactory();
             mqttClient = factory.CreateMqttClient();
 
             mqttOptions = new MqttClientOptionsBuilder()
