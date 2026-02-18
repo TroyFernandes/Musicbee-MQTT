@@ -5,17 +5,29 @@ A visual example of what is sent (MQTT Explorer):
 ```
 musicbee
     ➤ player
-        status = offline
-        playing = false
+        status = online
+        state = playing
+        output_devices = ["Primary Sound Driver", "Speakers"]
+        output_device = Primary Sound Driver
+        progress = 99
         volume = 73
         file = C:\Users\Troy\Music\Main\SZA\SOS\Far.flac
         position = 232
+        shuffle = true
+        repeat = off
+        muted = false
     ➤ song
         album = SOS
         albumart = /9j/4AAQSkZJRgABAQEBLAEsAAD/2wBDAAgGBgcGBQg ...
         title = Far
-        Artist = SZA
+        artist = SZA
         info = FLAC 44.1 kHz, 1502k
+        duration = 264
+        track = 22
+        albumartist = SZA
+        year = February 6, 2026
+        content_type = music
+        genre = Hip Hop
     command = {"command": "pause"}
 ```
 
@@ -59,20 +71,6 @@ Heres how you can create that file.
 3. Change to "Release" 
 
 4. Build the project. The output files will be in bin/release
-
-#### Optional Step (Highly Reccommended)
-
-The build output will be a bunch of .dll and .xml files, and it's unwieldy to copy all those to the musicbee plugins folder. So I reccommend to use [ILMerge](https://www.nuget.org/packages/ilmerge/) to assemble all the files into one .dll
-
-You can use [ILMergeGUI](https://github.com/jpdillingham/ILMergeGUI) to merge the assemblies. Just download the two, open ILMerge GUI and do the following:
-
-1. Open ILMergeGUI and add all the files from the release folder.
-
-2. In the "Assemblies to merge" field, only tick the .dll named "mb_MQTT.dll"
-
-3. Under output assembly, click the icon and choose a place to save the assembled .dll. Just make sure the name is "mb_MQTT.dll"
-
-4. That should be it, and you can now copy that file to the musicbee plugins folder
 
 **Issues you might encounter building the project**
 
