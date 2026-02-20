@@ -88,14 +88,21 @@ namespace MusicBeePlugin
 
         public void Close(PluginCloseReason reason)
         {
-            _closing = true;
+			_closing = true;
 
-            // Cancel any pending reconnect delay immediately
-            try { _shutdownCts?.Cancel(); } catch { }
+			//publish offline state to MQTT before shutdown, do not wait
+			if (mqttClient != null && mqttClient.IsConnected)
+			{
+				PublishAsync(mqttClient, "musicbee/player/state", "idle");
+				PublishAsync(mqttClient, "musicbee/player/status", "offline");
+			}
 
-            // Stop the progress timer first
-            _progressTimer?.Dispose();
-            _progressTimer = null;
+			// Cancel any pending reconnect delay immediately
+			try { _shutdownCts?.Cancel(); } catch { }
+
+			// Stop the progress timer first
+			_progressTimer?.Dispose();
+			_progressTimer = null;
 
             if (mqttClient != null)
             {
@@ -122,7 +129,7 @@ namespace MusicBeePlugin
             }
 
             try { _shutdownCts?.Dispose(); } catch { }
-            
+
             // Force garbage collection to clean up any remaining async continuations
             GC.Collect();
             GC.WaitForPendingFinalizers();
