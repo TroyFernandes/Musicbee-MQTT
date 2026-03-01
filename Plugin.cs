@@ -27,7 +27,7 @@ namespace MusicBeePlugin
         private volatile bool _closing;
         private System.Threading.Timer _progressTimer;
         private CancellationTokenSource _shutdownCts = new CancellationTokenSource();
-        
+
         // Event handler delegates to enable unsubscription
         private Func<MqttClientDisconnectedEventArgs, Task> _disconnectedHandler;
         private Func<MqttClientConnectedEventArgs, Task> _connectedHandler;
@@ -45,7 +45,7 @@ namespace MusicBeePlugin
             about.Type = PluginType.General;
             about.VersionMajor = 2;  // your plugin version
             about.VersionMinor = 0;
-            about.Revision = 4;
+            about.Revision = 5;
             about.MinInterfaceVersion = MinInterfaceVersion;
             about.MinApiRevision = MinApiRevision;
             about.ReceiveNotifications = (ReceiveNotificationFlags.PlayerEvents | ReceiveNotificationFlags.TagEvents);
@@ -88,41 +88,43 @@ namespace MusicBeePlugin
 
         public void Close(PluginCloseReason reason)
         {
-			_closing = true;
+            _closing = true;
 
-			//publish offline state to MQTT before shutdown, do not wait
-			if (mqttClient != null && mqttClient.IsConnected)
-			{
-				PublishAsync(mqttClient, "musicbee/player/state", "idle");
-				PublishAsync(mqttClient, "musicbee/player/status", "offline");
-			}
+            try { _shutdownCts?.Cancel(); } catch { }
 
-			// Cancel any pending reconnect delay immediately
-			try { _shutdownCts?.Cancel(); } catch { }
+            _progressTimer?.Dispose();
+            _progressTimer = null;
 
-			// Stop the progress timer first
-			_progressTimer?.Dispose();
-			_progressTimer = null;
+            if (mqttClient?.IsConnected == true)
+            {
+                try
+                {
+                    using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(500));
+                    var message = new MqttApplicationMessageBuilder()
+                        .WithTopic("musicbee/player/state")
+                        .WithPayload("idle")
+                        .WithQualityOfServiceLevel(MqttQualityOfServiceLevel.AtMostOnce)
+                        .WithRetainFlag(true)
+                        .Build();
+                    mqttClient.PublishAsync(message, cts.Token).WaitWithoutException();
+                }
+                catch { }
+            }
 
             if (mqttClient != null)
             {
                 try
                 {
-                    // CRITICAL: Unsubscribe event handlers FIRST to prevent them from firing during shutdown
                     if (_disconnectedHandler != null)
                         mqttClient.DisconnectedAsync -= _disconnectedHandler;
                     if (_connectedHandler != null)
                         mqttClient.ConnectedAsync -= _connectedHandler;
                     if (_messageReceivedHandler != null)
                         mqttClient.ApplicationMessageReceivedAsync -= _messageReceivedHandler;
-
-                    // For clean shutdown, skip graceful disconnect - just dispose immediately
-                    // This prevents any async handlers from blocking the shutdown
                 }
                 catch { }
                 finally
                 {
-                    // Force dispose regardless of state
                     try { mqttClient?.Dispose(); } catch { }
                     mqttClient = null;
                 }
@@ -130,7 +132,6 @@ namespace MusicBeePlugin
 
             try { _shutdownCts?.Dispose(); } catch { }
 
-            // Force garbage collection to clean up any remaining async continuations
             GC.Collect();
             GC.WaitForPendingFinalizers();
             GC.Collect();
@@ -144,7 +145,7 @@ namespace MusicBeePlugin
         {
             // Don't process any notifications during shutdown
             if (_closing) return;
-            
+
             // perform some action depending on the notification type
             switch (type)
             {
@@ -198,6 +199,8 @@ namespace MusicBeePlugin
                     PublishAsync(mqttClient, "musicbee/player/muted", mbApiInterface.Player_GetMute().ToString().ToLower()).WaitWithoutException();
                     break;
             }
+
+
         }
 
         private void ProgressTimerCallback(object state)
@@ -463,6 +466,9 @@ namespace MusicBeePlugin
                 .WithTcpServer(addr, port)
                 .WithCredentials(user, pass)
                 .WithCleanSession()
+                .WithWillTopic("musicbee/player/status")
+                .WithWillPayload("offline")
+                .WithWillRetain(true)
                 .Build();
 
             // Auto-reconnect on disconnect (only if not closing)
